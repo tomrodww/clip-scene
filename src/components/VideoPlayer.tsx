@@ -1,10 +1,11 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import YouTube, { YouTubeProps } from 'react-youtube';
+import YouTube, { YouTubeProps, YouTubePlayer } from 'react-youtube';
 import { Play, Pause, RotateCcw, Volume2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { extractYouTubeVideoId, formatSecondsToTime } from '@/lib/youtube';
+import { Skeleton } from './ui/skeleton';
 
 interface VideoPlayerProps {
   youtubeUrl: string;
@@ -23,7 +24,7 @@ export default function VideoPlayer({
   initialEndTime = "00:00:30",
   onTimeStateChange
 }: VideoPlayerProps) {
-  const [player, setPlayer] = useState<any>(null); // YouTube player instance
+  const [player, setPlayer] = useState<YouTubePlayer | null>(null); // YouTube player instance
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -31,7 +32,7 @@ export default function VideoPlayer({
   const [isDragging, setIsDragging] = useState<'start' | 'end' | 'seek' | null>(null);
   const [startTime, setStartTime] = useState(0);
   const [endTime, setEndTime] = useState(30);
-  
+  const [isLoading] = useState(false);
   const progressBarRef = useRef<HTMLDivElement>(null);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -186,6 +187,7 @@ export default function VideoPlayer({
       iv_load_policy: 3,
       modestbranding: 1,
       rel: 0,
+      origin: typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000',
     },
   };
 
@@ -195,7 +197,12 @@ export default function VideoPlayer({
   const clipWidth = endPercentage - startPercentage;
 
   return (
-    <div className="bg-gray-800">
+    isLoading ? (
+      <div className="flex justify-center items-center h-full">
+        <Skeleton className="h-8 w-8 animate-spin text-gray-400" />
+      </div>
+    ) : (
+      <div className="bg-gray-800">
       <div className="relative rounded-lg overflow-hidden mb-2">
         {videoId ? (
           <YouTube
@@ -384,5 +391,6 @@ export default function VideoPlayer({
 
       </div>
     </div>
+    )
   );
 } 
