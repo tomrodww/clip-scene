@@ -8,7 +8,6 @@ A fast Python backend for creating video clips from YouTube videos using yt-dlp 
 - **Efficient Clipping**: FFmpeg with stream copying (no re-encoding) for fast processing
 - **Async Processing**: Background job processing with status tracking
 - **Batch Processing**: Create multiple clips from one video
-- **ZIP Downloads**: Download all clips as a single ZIP file
 - **REST API**: FastAPI-based API with automatic documentation
 
 ## 🛠️ Requirements
@@ -118,14 +117,6 @@ Check the status of a processing job.
 }
 ```
 
-### 3. Download Clips
-
-**GET** `/download/{job_id}`
-
-Download all clips as a ZIP file.
-
-**Response:** ZIP file download
-
 ## 🏗️ Architecture
 
 ```
@@ -137,7 +128,6 @@ yt-dlp (Download)
     ↓ Video File
 FFmpeg (Clip Creation)
     ↓ Video Clips
-ZIP Archive → Download
 ```
 
 ## 🔧 Technical Details
@@ -161,7 +151,7 @@ ZIP Archive → Download
 ```
 backend/
 ├── downloads/          # Temporary video downloads
-├── clips/             # Generated clips and ZIP files
+├── clips/             # Generated clips
 ├── main.py           # FastAPI application
 ├── models/           # Pydantic models
 ├── services/         # Video processing logic

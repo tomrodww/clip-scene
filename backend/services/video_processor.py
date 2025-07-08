@@ -132,26 +132,6 @@ class VideoProcessor:
                     pass
             raise Exception(f"Failed to create clip: {str(e)}")
 
-    async def create_zip_archive(self, job_id: str, clips: list) -> str:
-        """
-        Create a zip archive containing all clips
-        """
-        import zipfile
-        
-        zip_filename = f"clips_{job_id}.zip"
-        zip_path = os.path.join(self.clips_dir, zip_filename)
-        
-        def create_zip_sync():
-            with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zip_file:
-                for clip in clips:
-                    if os.path.exists(clip["file_path"]):
-                        # Add to zip with a clean filename
-                        arc_name = f"{clip['title']}.mp4" if clip['title'] else f"clip_{clip['index'] + 1}.mp4"
-                        zip_file.write(clip["file_path"], arc_name)
-            return zip_path
-        
-        return await asyncio.get_event_loop().run_in_executor(None, create_zip_sync)
-
     async def get_latest_video_from_downloads(self) -> dict:
         """
         Get the most recently downloaded video from the downloads folder
