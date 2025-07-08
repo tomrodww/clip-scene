@@ -29,12 +29,13 @@ class VideoProcessor:
         try:
             # Sanitize job_id and title for filename
             safe_job_id = "".join(c for c in job_id if c.isalnum() or c in ('-', '_'))
-            safe_title = ""
-            if title:
-                safe_title = "_" + "".join(c for c in title if c.isalnum() or c in (' ', '-', '_')).strip().replace(' ', '_')
             
             # Create output filename
-            output_filename = f"{safe_job_id}_clip_{clip_index + 1}{safe_title}.mp4"
+            if title:
+                safe_title = "".join(c for c in title if c.isalnum() or c in (' ', '-', '_')).strip().replace(' ', '-')
+                output_filename = f"{safe_title}_{safe_job_id}_clip_{clip_index + 1}.mp4"
+            else:
+                output_filename = f"{safe_job_id}_clip_{clip_index + 1}.mp4"
             output_path = os.path.join(self.clips_dir, output_filename)
             
             # Ensure the source video exists

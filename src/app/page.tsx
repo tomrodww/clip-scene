@@ -444,7 +444,7 @@ export default function Home() {
                       No clips added yet.
                     </div>
                   ) : (
-                                         clips.map((clip, index) => (
+                    clips.map((clip, index) => (
                       <ClipCard
                         key={clip.id}
                         clip={clip}
@@ -520,9 +520,9 @@ export default function Home() {
             />
           )}
 
-                    {/* Downloaded Video Status */}
+          {/* Downloaded Video Status */}
           {videoStatus && (
-            <div className="force-dark-bg rounded-xl shadow-lg p-6">
+            <div className="force-dark-bg rounded-xl shadow-lg p-6 mb-8">
               <h3 className="text-xl font-semibold text-theme-text-primary mb-4">
                 Download Status
               </h3>
@@ -588,7 +588,7 @@ export default function Home() {
 
           {/* Error Display */}
           {error && (
-            <div className="bg-theme-error/10 border border-theme-error rounded-xl shadow-lg p-6">
+            <div className="bg-theme-error/10 border border-theme-error rounded-xl shadow-lg p-6 mb-8">
               <h3 className="text-xl font-semibold text-theme-error mb-2">
                 Error
               </h3>
@@ -598,25 +598,12 @@ export default function Home() {
 
           {/* Job Status Display */}
           {jobStatus && (
-            <div className="bg-gray-800 rounded-xl shadow-lg p-6">
+            <div className="bg-gray-800 rounded-xl shadow-lg p-6 mb-8">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-xl font-semibold text-white">
                   Processing Status
                 </h3>
-                {jobStatus.status === 'completed' && jobId && (
-                  <a
-                    href={ClipSceneAPI.getDownloadUrl(jobId)}
-                    download
-                    className={cn(
-                      "flex items-center gap-2 px-4 py-2 rounded-lg",
-                      "bg-green-600 hover:bg-green-700",
-                      "text-white transition-colors duration-200"
-                    )}
-                  >
-                    <Download className="h-4 w-4" />
-                    Download Clips
-                  </a>
-                )}
+
               </div>
               
               <div className="space-y-4">

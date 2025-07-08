@@ -23,47 +23,41 @@ export default function ClipCard({
     <div
       key={clip.id}
       className={cn(
-        "p-4 border rounded-lg cursor-pointer transition-all duration-200 force-dark-bg",
+        "py-2 px-4 border rounded-lg cursor-pointer transition-all duration-200 force-dark-bg",
         isSelected
           ? "border-theme-primary bg-theme-primary/10"
           : "border-theme-border-primary hover:border-theme-primary"
       )}
       onClick={() => onSelect(clip.id)}
     >
-      <div className="flex items-center gap-4">
+      <div className="flex flex-col items-start gap-2">
         <div className="flex-shrink-0">
           <div className={cn(
-            "text-sm font-medium",
+            "text-sm font-medium flex flex-row items-center h-8",
             isSelected
               ? "force-orange-text"
               : "force-white-text"
           )}>
-            <div>
-              Clip {index + 1}
+            <div className="text-center">
+              Clip {index + 1}: <span className="text-xs text-gray-400">{clip.title}</span>
               {isSelected && " (Editing)"}
             </div>
-            {clip.title && (
-              <div className="text-xs text-gray-400 mt-1">
-                {clip.title}
-              </div>
-            )}
           </div>
         </div>
         
-        <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-xs font-medium text-gray-400 mb-1">
-              Start Time (hh:mm:ss)
+        <div className="flex flex-row gap-4 h-8">
+          <div className="flex flex-row items-center">
+            <label className="block text-sm font-medium text-gray-400 pr-2">
+              Start
             </label>
             <input
               type="text"
               value={clip.startTime}
               onChange={(e) => onUpdateClip(clip.id, 'startTime', e.target.value)}
-              placeholder="00:01:30"
               pattern="[0-9]{2}:[0-9]{2}:[0-9]{2}"
               className={cn(
-                "w-full px-3 py-2 rounded border border-gray-600",
-                "bg-gray-800 force-white-text",
+                "w-fit p-2 rounded border border-theme-border-primary",
+                "force-white-text",
                 "focus:ring-2 focus:ring-orange-500 focus:border-orange-500",
                 "placeholder-gray-400"
               )}
@@ -71,9 +65,9 @@ export default function ClipCard({
             />
           </div>
           
-          <div>
-            <label className="block text-xs font-medium text-gray-400 mb-1">
-              End Time (hh:mm:ss)
+          <div className="flex flex-row items-center">
+            <label className="block text-sm font-medium text-gray-400 pr-2">
+              End
             </label>
             <input
               type="text"
@@ -82,16 +76,14 @@ export default function ClipCard({
               placeholder="00:02:00"
               pattern="[0-9]{2}:[0-9]{2}:[0-9]{2}"
               className={cn(
-                "w-full px-3 py-2 rounded border border-gray-600",
-                "bg-gray-800 force-white-text",
+                "w-fit p-2 rounded border border-theme-border-primary",
+                "force-white-text",
                 "focus:ring-2 focus:ring-orange-500 focus:border-orange-500",
                 "placeholder-gray-400"
               )}
               required
             />
           </div>
-        </div>
-
         <button
           type="button"
           onClick={() => onRemoveClip(clip.id)}
@@ -103,8 +95,10 @@ export default function ClipCard({
           )}
           title="Remove clip"
         >
-          <Trash2 className="h-4 w-4" />
+          <Trash2 className="h-4 w-4 text-red-500" />
         </button>
+        </div>
+
       </div>
     </div>
   );

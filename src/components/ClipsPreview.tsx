@@ -39,7 +39,7 @@ export default function ClipsPreview({
   };
 
   return (
-    <div className="space-y-6 p-6 border border-theme-border-primary rounded-lg force-dark-bg">
+    <div className="space-y-6 p-6 border border-theme-border-primary rounded-lg force-dark-bg mb-8">
       {/* Header */}
       <div className="text-center space-y-2">
         <h2 className="text-xl font-bold force-orange-text">Clips Preview</h2>

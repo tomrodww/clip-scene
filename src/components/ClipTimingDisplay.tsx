@@ -68,10 +68,10 @@ export default function ClipTimingDisplay({
           onChange={(e) => setClipTitle(e.target.value)}
           placeholder="Clip title (optional)"
           className={cn(
-            "w-full px-3 py-2 rounded border border-gray-600",
-            "bg-gray-800 force-white-text text-sm",
+            "w-full px-3 py-2 rounded border border-theme-border-primary",
+            "force-white-text text-sm",
             "focus:ring-2 focus:ring-orange-500 focus:border-orange-500",
-            "placeholder-gray-400"
+            "placeholder-gray-300"
           )}
         />
         <button
