@@ -8,7 +8,7 @@ import VideoPlayer from "@/components/VideoPlayer";
 import ClipTimingDisplay from "@/components/ClipTimingDisplay";
 import ClipsPreview from "@/components/ClipsPreview";
 import ClipCard from "@/components/ClipCard";
-import { ClipSceneAPI, JobStatus, VideoStatus, VideoInfo, VideoFormat, ClipsPreviewResponse } from "@/lib/api";
+import { ClipSceneAPI, JobStatus, VideoStatus, VideoInfo, VideoFormat, ClipsPreviewResponse, JobStatusWithProgress } from "@/lib/api";
 import { QualitySelector } from '@/components/QualitySelector';
 import { QualityOption, getBestAvailableQuality, findFormatForQuality, isQualityAvailable } from '@/lib/quality-utils';
 
@@ -45,6 +45,11 @@ export default function Home() {
   const [clipsPreviewData, setClipsPreviewData] = useState<ClipsPreviewResponse | null>(null);
   const [isLoadingPreview, setIsLoadingPreview] = useState(false);
   const [isCreatingClips, setIsCreatingClips] = useState(false);
+
+  // Unified process state
+  const [isUnifiedProcessing, setIsUnifiedProcessing] = useState(false);
+  const [unifiedJobId, setUnifiedJobId] = useState<string | null>(null);
+  const [unifiedJobStatus, setUnifiedJobStatus] = useState<JobStatusWithProgress | null>(null);
 
   // Load available videos on component mount
   useEffect(() => {
@@ -276,6 +281,57 @@ export default function Home() {
     setClipsPreviewData(null);
   };
 
+  const handleDownloadAndCreateClips = async () => {
+    if (!youtubeUrl.trim()) {
+      alert("Please enter a YouTube URL");
+      return;
+    }
+
+    if (clips.length === 0) {
+      alert("Please add at least one clip before creating clips");
+      return;
+    }
+
+    const invalidClips = clips.filter(clip => 
+      !validateTimeFormat(clip.startTime) || !validateTimeFormat(clip.endTime)
+    );
+
+    if (invalidClips.length > 0) {
+      alert("Please enter valid time formats (hh:mm:ss) for all clips");
+      return;
+    }
+
+    setIsUnifiedProcessing(true);
+    setError(null);
+    setUnifiedJobStatus(null);
+
+    try {
+      // Find the format for the selected quality using utility function
+      const selectedFormat = findFormatForQuality(selectedQuality, availableFormats);
+
+      const response = await ClipSceneAPI.downloadAndCreateClips({
+        youtube_url: youtubeUrl.trim(),
+        clips: clips.map(clip => ({
+          title: clip.title,
+          start_time: clip.startTime,
+          end_time: clip.endTime
+        }))
+      });
+
+      setUnifiedJobId(response.job_id);
+
+      // Start polling for unified status
+      await ClipSceneAPI.pollUnifiedJobStatus(response.job_id, (status) => {
+        setUnifiedJobStatus(status);
+      });
+
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Process failed');
+    } finally {
+      setIsUnifiedProcessing(false);
+    }
+  };
+
   const loadAvailableVideos = async () => {
     // Function to reload videos list - not currently used in UI
     // but kept for future integration
@@ -470,45 +526,116 @@ export default function Home() {
                 downloadStatus={isDownloading}
               />
 
-              {/* Action Buttons */}
-              <div className="flex gap-4">
+              {/* Unified Action Button */}
+              <div className="flex justify-center">
                 <button
                   type="button"
-                  onClick={handleDownloadVideo}
-                  disabled={isDownloading || !youtubeUrl.trim()}
+                  onClick={handleDownloadAndCreateClips}
+                  disabled={isUnifiedProcessing || !youtubeUrl.trim() || clips.length === 0}
                   className={cn(
-                    "flex-1 py-3 px-6 rounded-lg font-bold text-lg force-orange text-black",
+                    "w-full py-4 px-8 rounded-lg font-bold text-xl force-orange text-black",
                     "hover:bg-orange-600 hover:cursor-pointer",
                     "transition-all duration-200",
                     "focus:ring-2 focus:ring-orange-500 focus:ring-offset-2",
                     "disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-gray-600 disabled:text-gray-800",
-                    "flex items-center justify-center gap-2"
+                    "flex items-center justify-center gap-3"
                   )}
                 >
-                  {isDownloading && <Loader2 className="h-4 w-4 animate-spin" />}
-                  {isDownloading ? "Downloading..." : `Download (${selectedQuality})`}
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handleCreateClips}
-                  disabled={isLoadingPreview || clips.length === 0}
-                  className={cn(
-                    "flex-1 py-3 px-6 rounded-lg font-bold text-lg",
-                    "bg-gray-800 border-2 force-orange-border force-white-text",
-                    "hover:force-orange hover:text-black hover:cursor-pointer",
-                    "transition-all duration-200",
-                    "focus:ring-2 focus:ring-orange-500 focus:ring-offset-2",
-                    "disabled:opacity-50 disabled:cursor-not-allowed disabled:border-gray-600 disabled:text-gray-300",
-                    "flex items-center justify-center gap-2"
-                  )}
-                >
-                  {isLoadingPreview && <Loader2 className="h-4 w-4 animate-spin" />}
-                  {isLoadingPreview ? "Loading preview..." : "Create Clips"}
+                  {isUnifiedProcessing && <Loader2 className="h-5 w-5 animate-spin" />}
+                  {isUnifiedProcessing ? "Processing..." : `Download and Create Clips (${selectedQuality})`}
                 </button>
               </div>
             </form>
           </div>
+
+                    {/* Unified Process Status */}
+          {unifiedJobStatus && (
+            <div className="force-dark-bg rounded-xl shadow-lg p-6 mb-8">
+              <h3 className="text-xl font-semibold text-theme-text-primary mb-4">
+                Download and Create Clips Progress
+              </h3>
+              
+              <div className="space-y-4">
+                {/* Progress Bar */}
+                <div>
+                  <div className="flex justify-between text-sm text-theme-text-secondary mb-2">
+                    <span>Overall Progress</span>
+                    <span>{unifiedJobStatus.progress_percentage}%</span>
+                  </div>
+                  <div className="w-full bg-theme-bg-tertiary rounded-full h-3">
+                    <div 
+                      className={cn(
+                        "h-3 rounded-full transition-all duration-500",
+                        unifiedJobStatus.status === 'completed' ? "bg-green-500" : 
+                        unifiedJobStatus.status === 'error' ? "bg-red-500" : "bg-orange-500"
+                      )}
+                      style={{
+                        width: `${unifiedJobStatus.progress_percentage}%`
+                      }}
+                    />
+                  </div>
+                </div>
+
+                {/* Status Badge */}
+                <div className="flex items-center gap-2">
+                  <span className="text-theme-text-secondary">Status:</span>
+                  <span className={cn(
+                    "px-3 py-1 rounded-full text-sm font-medium",
+                    unifiedJobStatus.status === 'downloading' && "bg-blue-500/20 text-blue-300",
+                    unifiedJobStatus.status === 'processing' && "bg-orange-500/20 text-orange-300",
+                    unifiedJobStatus.status === 'completed' && "bg-green-500/20 text-green-300",
+                    unifiedJobStatus.status === 'error' && "bg-red-500/20 text-red-300"
+                  )}>
+                    {unifiedJobStatus.status.charAt(0).toUpperCase() + unifiedJobStatus.status.slice(1)}
+                  </span>
+                </div>
+
+                {/* Current Step */}
+                <div className="flex items-center gap-2">
+                  <span className="text-theme-text-secondary">Current step:</span>
+                  <span className="text-theme-text-primary font-medium">
+                    {unifiedJobStatus.current_step}
+                  </span>
+                </div>
+
+                {/* Clips Progress */}
+                {unifiedJobStatus.total_clips > 0 && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-theme-text-secondary">Clips completed:</span>
+                    <span className="text-theme-text-primary font-medium">
+                      {unifiedJobStatus.completed_clips} / {unifiedJobStatus.total_clips}
+                    </span>
+                  </div>
+                )}
+
+                {/* Download Button (when completed) */}
+                {unifiedJobStatus.status === 'completed' && unifiedJobId && (
+                  <div className="pt-4">
+                    <a
+                      href={ClipSceneAPI.getDownloadUrl(unifiedJobId)}
+                      download
+                      className={cn(
+                        "flex items-center justify-center gap-2 w-full py-3 px-6 rounded-lg",
+                        "bg-green-600 hover:bg-green-700 text-white font-bold",
+                        "transition-colors duration-200"
+                      )}
+                    >
+                      <Download className="h-5 w-5" />
+                      Download All Clips ({unifiedJobStatus.clips.length} files)
+                    </a>
+                  </div>
+                )}
+
+                {/* Error Details */}
+                {unifiedJobStatus.error && (
+                  <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg">
+                    <div className="text-red-400 font-medium">Error:</div>
+                    <div className="text-red-300 text-sm mt-1">{unifiedJobStatus.error}</div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Clips Preview */}
           {showClipsPreview && clipsPreviewData && (
@@ -520,7 +647,7 @@ export default function Home() {
             />
           )}
 
-          {/* Downloaded Video Status */}
+                    {/* Downloaded Video Status */}
           {videoStatus && (
             <div className="force-dark-bg rounded-xl shadow-lg p-6 mb-8">
               <h3 className="text-xl font-semibold text-theme-text-primary mb-4">

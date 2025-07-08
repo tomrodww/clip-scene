@@ -312,6 +312,51 @@ async def create_clips(request: ClipRequest, background_tasks: BackgroundTasks):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.post("/download-and-create-clips")
+async def download_and_create_clips(request: ClipRequest, background_tasks: BackgroundTasks):
+    """
+    Unified endpoint: Download video and create clips in one step
+    """
+    try:
+        # Generate unique job ID
+        job_id = str(uuid.uuid4())
+        
+        # Validate the request
+        if not request.youtube_url:
+            raise HTTPException(status_code=400, detail="YouTube URL is required")
+        
+        if not request.clips or len(request.clips) == 0:
+            raise HTTPException(status_code=400, detail="At least one clip is required")
+        
+        # Initialize job status for unified process
+        processing_jobs[job_id] = {
+            "status": "downloading",
+            "current_step": "Starting video download...",
+            "total_clips": len(request.clips),
+            "completed_clips": 0,
+            "clips": [],
+            "video_id": None,
+            "error": None,
+            "progress_percentage": 0
+        }
+        
+        # Start unified background processing
+        background_tasks.add_task(
+            download_and_create_clips_background, 
+            job_id, 
+            request.youtube_url, 
+            request.clips
+        )
+        
+        return {
+            "job_id": job_id,
+            "status": "started",
+            "message": f"Starting download and creation of {len(request.clips)} clips"
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.get("/job/{job_id}")
 async def get_job_status(job_id: str):
     """
@@ -577,6 +622,97 @@ async def process_clips_background(job_id: str, youtube_url: str, clips: List[Cl
         processing_jobs[job_id]["status"] = "error"
         processing_jobs[job_id]["error"] = str(e)
         print(f"Error in background processing: {e}")
+
+async def download_and_create_clips_background(job_id: str, youtube_url: str, clips: List[ClipData]):
+    """
+    Unified background task: Download video, create clips, delete original video
+    """
+    try:
+        job = processing_jobs[job_id]
+        
+        # Step 1: Download Video
+        job["current_step"] = "Downloading video from YouTube..."
+        job["progress_percentage"] = 10
+        
+        # Generate unique video ID for download
+        video_id = str(uuid.uuid4())
+        
+        try:
+            video_path = await video_processor.download_video(youtube_url, video_id)
+            job["current_step"] = "Video download completed"
+            job["progress_percentage"] = 30
+            job["video_id"] = video_id
+        except Exception as e:
+            job["status"] = "error"
+            job["error"] = f"Failed to download video: {str(e)}"
+            job["current_step"] = "Download failed"
+            return
+        
+        # Step 2: Create Clips
+        job["current_step"] = "Starting clip creation..."
+        job["status"] = "processing"
+        job["progress_percentage"] = 40
+        
+        # Process each clip
+        for i, clip in enumerate(clips):
+            try:
+                job["current_step"] = f"Creating clip {i + 1} of {len(clips)}: {clip.title or f'Clip {i + 1}'}"
+                job["progress_percentage"] = 40 + (i / len(clips)) * 50  # 40-90% for clip creation
+                
+                clip_path = await video_processor.create_clip(
+                    video_path, 
+                    clip.start_time, 
+                    clip.end_time, 
+                    job_id, 
+                    i,
+                    clip.title
+                )
+                
+                job["clips"].append({
+                    "index": i,
+                    "title": clip.title or f"Clip {i + 1}",
+                    "start_time": clip.start_time,
+                    "end_time": clip.end_time,
+                    "file_path": clip_path,
+                    "file_size": os.path.getsize(clip_path)
+                })
+                
+                job["completed_clips"] += 1
+                
+            except Exception as e:
+                job["status"] = "error"
+                job["error"] = f"Failed to create clip {i + 1}: {str(e)}"
+                job["current_step"] = f"Failed creating clip {i + 1}"
+                return
+        
+        # Step 3: Delete Original Video
+        job["current_step"] = "Cleaning up: deleting original video..."
+        job["progress_percentage"] = 95
+        
+        try:
+            if os.path.exists(video_path):
+                os.remove(video_path)
+                job["current_step"] = "Original video deleted successfully"
+            else:
+                job["current_step"] = "Original video already removed"
+        except Exception as e:
+            # Don't fail the entire process if we can't delete the original
+            job["current_step"] = f"Warning: Could not delete original video: {str(e)}"
+        
+        # Step 4: Complete
+        job["status"] = "completed"
+        job["current_step"] = f"Process completed! Created {len(job['clips'])} clips"
+        job["progress_percentage"] = 100
+        
+        # Clean up video tracking if it was added to downloaded_videos
+        if video_id in downloaded_videos:
+            del downloaded_videos[video_id]
+        
+    except Exception as e:
+        processing_jobs[job_id]["status"] = "error"
+        processing_jobs[job_id]["error"] = str(e)
+        processing_jobs[job_id]["current_step"] = f"Process failed: {str(e)}"
+        print(f"Error in unified process {job_id}: {e}")
 
 if __name__ == "__main__":
     import uvicorn

@@ -108,6 +108,24 @@ export interface VideoFormatsResponse {
   formats: VideoFormat[];
 }
 
+export interface JobStatusWithProgress {
+  status: string;
+  current_step: string;
+  total_clips: number;
+  completed_clips: number;
+  clips: Array<{
+    index: number;
+    title: string;
+    start_time: string;
+    end_time: string;
+    file_path: string;
+    file_size: number;
+  }>;
+  video_id?: string;
+  error?: string;
+  progress_percentage: number;
+}
+
 const API_BASE = 'http://localhost:8000';
 
 export class ClipSceneAPI {
@@ -194,6 +212,53 @@ export class ClipSceneAPI {
     }
 
     return response.json();
+  }
+
+  static async downloadAndCreateClips(request: ClipRequest): Promise<CreateClipsResponse> {
+    const response = await fetch(`${API_BASE}/download-and-create-clips`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(request),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.detail || 'Failed to start unified process');
+    }
+
+    return response.json();
+  }
+
+  static async pollUnifiedJobStatus(
+    jobId: string, 
+    onProgress: (status: JobStatusWithProgress) => void
+  ): Promise<JobStatusWithProgress> {
+    return new Promise((resolve, reject) => {
+      const pollInterval = setInterval(async () => {
+        try {
+          const response = await fetch(`${API_BASE}/job/${jobId}`);
+          
+          if (!response.ok) {
+            clearInterval(pollInterval);
+            reject(new Error('Failed to get job status'));
+            return;
+          }
+
+          const status: JobStatusWithProgress = await response.json();
+          onProgress(status);
+
+          if (status.status === 'completed' || status.status === 'error') {
+            clearInterval(pollInterval);
+            resolve(status);
+          }
+        } catch (error) {
+          clearInterval(pollInterval);
+          reject(error);
+        }
+      }, 1000); // Poll every second
+    });
   }
 
   static async pollVideoStatus(
