@@ -1,12 +1,201 @@
 import os
 import asyncio
 import yt_dlp
+import subprocess
 
 class VideoProcessor:
     def __init__(self):
         self.download_dir = "downloads"
-        # Ensure directory exists
+        self.clips_dir = "clips"
+        # Ensure directories exist
         os.makedirs(self.download_dir, exist_ok=True)
+        os.makedirs(self.clips_dir, exist_ok=True)
+    
+    async def create_clip(self, video_path: str, start_time: str, end_time: str, job_id: str, clip_index: int, title: str = None) -> str:
+        """
+        Create a video clip using ffmpeg
+        
+        Args:
+            video_path: Path to the source video file
+            start_time: Start time in format "hh:mm:ss"
+            end_time: End time in format "hh:mm:ss"
+            job_id: Unique job identifier
+            clip_index: Index of the clip
+            title: Optional title for the clip
+            
+        Returns:
+            Path to the created clip file
+        """
+        try:
+            # Sanitize job_id and title for filename
+            safe_job_id = "".join(c for c in job_id if c.isalnum() or c in ('-', '_'))
+            safe_title = ""
+            if title:
+                safe_title = "_" + "".join(c for c in title if c.isalnum() or c in (' ', '-', '_')).strip().replace(' ', '_')
+            
+            # Create output filename
+            output_filename = f"{safe_job_id}_clip_{clip_index + 1}{safe_title}.mp4"
+            output_path = os.path.join(self.clips_dir, output_filename)
+            
+            # Ensure the source video exists
+            if not os.path.exists(video_path):
+                raise Exception(f"Source video not found: {video_path}")
+            
+            # Calculate duration for more efficient processing
+            duration_cmd = [
+                'ffprobe', '-v', 'quiet', '-show_entries', 'format=duration',
+                '-of', 'default=noprint_wrappers=1:nokey=1', video_path
+            ]
+            
+            def get_duration_sync():
+                try:
+                    result = subprocess.run(duration_cmd, capture_output=True, text=True, check=True)
+                    return float(result.stdout.strip())
+                except:
+                    return None
+            
+            # Get video duration
+            video_duration = await asyncio.get_event_loop().run_in_executor(None, get_duration_sync)
+            
+            # Convert time strings to seconds for validation
+            def time_to_seconds(time_str):
+                parts = time_str.split(':')
+                return int(parts[0]) * 3600 + int(parts[1]) * 60 + int(parts[2])
+            
+            start_seconds = time_to_seconds(start_time)
+            end_seconds = time_to_seconds(end_time)
+            
+            # Validate time ranges
+            if start_seconds >= end_seconds:
+                raise Exception(f"Start time ({start_time}) must be before end time ({end_time})")
+            
+            if video_duration and end_seconds > video_duration:
+                raise Exception(f"End time ({end_time}) exceeds video duration ({video_duration:.2f}s)")
+            
+            # Build ffmpeg command
+            # Using fast and high-quality settings
+            cmd = [
+                'ffmpeg',
+                '-ss', start_time,  # Start time (seeking before input for efficiency)
+                '-i', video_path,   # Input file
+                '-t', str(end_seconds - start_seconds),  # Duration
+                '-c:v', 'libx264',  # Video codec
+                '-c:a', 'aac',      # Audio codec
+                '-preset', 'fast',  # Encoding speed
+                '-crf', '23',       # Quality level (lower = better quality)
+                '-avoid_negative_ts', 'make_zero',  # Handle timestamp issues
+                '-y',               # Overwrite output file
+                output_path
+            ]
+            
+            print(f"Creating clip: {output_filename}")
+            print(f"Command: {' '.join(cmd)}")
+            
+            # Execute ffmpeg command in executor
+            def run_ffmpeg_sync():
+                try:
+                    result = subprocess.run(
+                        cmd, 
+                        capture_output=True, 
+                        text=True, 
+                        check=True,
+                        timeout=300  # 5 minute timeout
+                    )
+                    return result
+                except subprocess.CalledProcessError as e:
+                    raise Exception(f"FFmpeg failed: {e.stderr}")
+                except subprocess.TimeoutExpired:
+                    raise Exception("FFmpeg timeout: clip creation took too long")
+            
+            # Run ffmpeg
+            await asyncio.get_event_loop().run_in_executor(None, run_ffmpeg_sync)
+            
+            # Verify output file was created
+            if not os.path.exists(output_path):
+                raise Exception(f"Clip file was not created: {output_path}")
+            
+            # Verify file size is reasonable
+            file_size = os.path.getsize(output_path)
+            if file_size < 1024:  # Less than 1KB is suspicious
+                raise Exception(f"Created clip file seems too small: {file_size} bytes")
+            
+            print(f"✅ Clip created successfully: {output_path} ({file_size} bytes)")
+            return output_path
+            
+        except Exception as e:
+            # Clean up partial file if it exists
+            if 'output_path' in locals() and os.path.exists(output_path):
+                try:
+                    os.remove(output_path)
+                except:
+                    pass
+            raise Exception(f"Failed to create clip: {str(e)}")
+
+    async def create_zip_archive(self, job_id: str, clips: list) -> str:
+        """
+        Create a zip archive containing all clips
+        """
+        import zipfile
+        
+        zip_filename = f"clips_{job_id}.zip"
+        zip_path = os.path.join(self.clips_dir, zip_filename)
+        
+        def create_zip_sync():
+            with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+                for clip in clips:
+                    if os.path.exists(clip["file_path"]):
+                        # Add to zip with a clean filename
+                        arc_name = f"{clip['title']}.mp4" if clip['title'] else f"clip_{clip['index'] + 1}.mp4"
+                        zip_file.write(clip["file_path"], arc_name)
+            return zip_path
+        
+        return await asyncio.get_event_loop().run_in_executor(None, create_zip_sync)
+
+    async def get_latest_video_from_downloads(self) -> dict:
+        """
+        Get the most recently downloaded video from the downloads folder
+        """
+        try:
+            # List all files in downloads directory
+            download_files = []
+            for filename in os.listdir(self.download_dir):
+                file_path = os.path.join(self.download_dir, filename)
+                if os.path.isfile(file_path) and filename.endswith(('.mp4', '.webm', '.mkv')):
+                    # Get file stats
+                    stat = os.stat(file_path)
+                    download_files.append({
+                        'filename': filename,
+                        'path': file_path,
+                        'size': stat.st_size,
+                        'modified_time': stat.st_mtime
+                    })
+            
+            if not download_files:
+                return None
+            
+            # Sort by modification time (newest first)
+            download_files.sort(key=lambda x: x['modified_time'], reverse=True)
+            latest_file = download_files[0]
+            
+            # Extract title from filename (remove UUID prefix if present)
+            title = latest_file['filename']
+            if '_' in title:
+                # Remove UUID prefix and file extension
+                title_part = title.split('_', 1)[1] if len(title.split('_', 1)) > 1 else title
+                title = os.path.splitext(title_part)[0]
+            else:
+                title = os.path.splitext(title)[0]
+            
+            return {
+                'filename': latest_file['filename'],
+                'path': latest_file['path'],
+                'title': title,
+                'size': latest_file['size'],
+                'modified_time': latest_file['modified_time']
+            }
+            
+        except Exception as e:
+            raise Exception(f"Failed to get latest video: {str(e)}")
     
     async def list_available_formats(self, youtube_url: str):
         """

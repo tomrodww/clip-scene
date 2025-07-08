@@ -16,7 +16,7 @@ class DownloadRequest(BaseModel):
     format_id: Optional[str] = None  # Specific format ID for quality selection
 
 class CreateClipsRequest(BaseModel):
-    video_id: str  # ID of the downloaded video
+    video_id: Optional[str] = None  # ID of the downloaded video (optional - uses latest if not provided)
     clips: List[ClipData]
 
 class VideoInfo(BaseModel):

@@ -212,13 +212,27 @@ async def create_clips_from_video(request: CreateClipsRequest, background_tasks:
     Create clips from an already downloaded video
     """
     try:
-        # Check if video exists
-        if request.video_id not in downloaded_videos:
-            raise HTTPException(status_code=404, detail="Video not found")
-        
-        video_info = downloaded_videos[request.video_id]
-        if video_info["status"] != "completed":
-            raise HTTPException(status_code=400, detail="Video is not ready")
+        # Get video info - either from provided video_id or latest video
+        if request.video_id:
+            # Check if video exists in downloaded_videos
+            if request.video_id not in downloaded_videos:
+                raise HTTPException(status_code=404, detail="Video not found")
+            
+            video_info = downloaded_videos[request.video_id]
+            if video_info["status"] != "completed":
+                raise HTTPException(status_code=400, detail="Video is not ready")
+        else:
+            # Use latest video from downloads folder
+            latest_video = await video_processor.get_latest_video_from_downloads()
+            if not latest_video:
+                raise HTTPException(status_code=404, detail="No videos found in downloads folder")
+            
+            video_info = {
+                "title": latest_video["title"],
+                "file_path": latest_video["path"],
+                "file_size": latest_video["size"],
+                "status": "completed"
+            }
         
         # Validate clips
         if not request.clips or len(request.clips) == 0:
@@ -234,7 +248,7 @@ async def create_clips_from_video(request: CreateClipsRequest, background_tasks:
             "total_clips": len(request.clips),
             "completed_clips": 0,
             "clips": [],
-            "video_id": request.video_id,
+            "video_id": request.video_id or "latest",
             "error": None
         }
         
@@ -328,6 +342,102 @@ async def download_clips(job_id: str):
         media_type="application/zip",
         filename=f"clips_{job_id}.zip"
     )
+
+@app.get("/latest-video")
+async def get_latest_video():
+    """
+    Get the latest video from downloads folder
+    """
+    try:
+        latest_video = await video_processor.get_latest_video_from_downloads()
+        
+        if not latest_video:
+            raise HTTPException(status_code=404, detail="No videos found in downloads folder")
+        
+        return {
+            "filename": latest_video["filename"],
+            "title": latest_video["title"],
+            "size": latest_video["size"],
+            "path": latest_video["path"]
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/preview-clips")
+async def preview_clips(request: CreateClipsRequest):
+    """
+    Preview clips without actually creating them - for confirmation step
+    """
+    try:
+        # Get the latest video from downloads if no video_id provided
+        if not request.video_id:
+            latest_video = await video_processor.get_latest_video_from_downloads()
+            if not latest_video:
+                raise HTTPException(status_code=404, detail="No videos found in downloads folder")
+            
+            video_info = {
+                "title": latest_video["title"],
+                "file_path": latest_video["path"],
+                "file_size": latest_video["size"]
+            }
+        else:
+            # Check if video exists in downloaded_videos
+            if request.video_id not in downloaded_videos:
+                raise HTTPException(status_code=404, detail="Video not found")
+            
+            video_info = downloaded_videos[request.video_id]
+            if video_info["status"] != "completed":
+                raise HTTPException(status_code=400, detail="Video is not ready")
+        
+        # Validate clips
+        if not request.clips or len(request.clips) == 0:
+            raise HTTPException(status_code=400, detail="At least one clip is required")
+        
+        # Return preview information
+        clips_preview = []
+        for i, clip in enumerate(request.clips):
+            clips_preview.append({
+                "index": i,
+                "title": clip.title or f"Clip {i + 1}",
+                "start_time": clip.start_time,
+                "end_time": clip.end_time,
+                "duration": calculate_clip_duration(clip.start_time, clip.end_time)
+            })
+        
+        return {
+            "video": {
+                "title": video_info.get("title", "Unknown"),
+                "file_path": video_info.get("file_path"),
+                "file_size": video_info.get("file_size", 0)
+            },
+            "clips": clips_preview,
+            "total_clips": len(clips_preview)
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+def calculate_clip_duration(start_time: str, end_time: str) -> str:
+    """
+    Calculate duration between start and end time
+    """
+    try:
+        def time_to_seconds(time_str):
+            parts = time_str.split(':')
+            return int(parts[0]) * 3600 + int(parts[1]) * 60 + int(parts[2])
+        
+        start_seconds = time_to_seconds(start_time)
+        end_seconds = time_to_seconds(end_time)
+        duration_seconds = end_seconds - start_seconds
+        
+        hours = duration_seconds // 3600
+        minutes = (duration_seconds % 3600) // 60
+        seconds = duration_seconds % 60
+        
+        return f"{hours:02d}:{minutes:02d}:{seconds:02d}"
+    except:
+        return "00:00:00"
 
 async def download_video_background(video_id: str, youtube_url: str, format_id: str = None):
     """

@@ -66,6 +66,34 @@ export interface CreateClipsFromVideoRequest {
   clips: ClipData[];
 }
 
+export interface ClipsPreviewRequest {
+  video_id?: string;  // Optional - if not provided, uses latest video
+  clips: ClipData[];
+}
+
+export interface LatestVideoResponse {
+  filename: string;
+  title: string;
+  size: number;
+  path: string;
+}
+
+export interface ClipsPreviewResponse {
+  video: {
+    title: string;
+    file_path: string;
+    file_size: number;
+  };
+  clips: Array<{
+    index: number;
+    title: string;
+    start_time: string;
+    end_time: string;
+    duration: string;
+  }>;
+  total_clips: number;
+}
+
 export interface VideoFormat {
   format_id: string;
   quality_label: string;
@@ -135,6 +163,34 @@ export class ClipSceneAPI {
     if (!response.ok) {
       const error = await response.json();
       throw new Error(error.detail || 'Failed to create clips');
+    }
+
+    return response.json();
+  }
+
+  static async getLatestVideo(): Promise<LatestVideoResponse> {
+    const response = await fetch(`${API_BASE}/latest-video`);
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.detail || 'Failed to get latest video');
+    }
+
+    return response.json();
+  }
+
+  static async previewClips(request: ClipsPreviewRequest): Promise<ClipsPreviewResponse> {
+    const response = await fetch(`${API_BASE}/preview-clips`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(request),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.detail || 'Failed to preview clips');
     }
 
     return response.json();

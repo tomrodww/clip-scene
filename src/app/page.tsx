@@ -6,8 +6,9 @@ import { cn } from "@/lib/utils";
 import { ClipData } from "@/types";
 import VideoPlayer from "@/components/VideoPlayer";
 import ClipTimingDisplay from "@/components/ClipTimingDisplay";
+import ClipsPreview from "@/components/ClipsPreview";
 import ClipCard from "@/components/ClipCard";
-import { ClipSceneAPI, JobStatus, VideoStatus, VideoInfo, VideoFormat } from "@/lib/api";
+import { ClipSceneAPI, JobStatus, VideoStatus, VideoInfo, VideoFormat, ClipsPreviewResponse } from "@/lib/api";
 import { QualitySelector } from '@/components/QualitySelector';
 import { QualityOption, getBestAvailableQuality, findFormatForQuality, isQualityAvailable } from '@/lib/quality-utils';
 
@@ -38,6 +39,12 @@ export default function Home() {
   const [isLoadingFormats, setIsLoadingFormats] = useState(false);
   const [formatsError, setFormatsError] = useState<string | null>(null);
   const [selectedQuality, setSelectedQuality] = useState<QualityOption>('1080p');
+
+  // Clips preview state
+  const [showClipsPreview, setShowClipsPreview] = useState(false);
+  const [clipsPreviewData, setClipsPreviewData] = useState<ClipsPreviewResponse | null>(null);
+  const [isLoadingPreview, setIsLoadingPreview] = useState(false);
+  const [isCreatingClips, setIsCreatingClips] = useState(false);
 
   // Load available videos on component mount
   useEffect(() => {
@@ -185,11 +192,7 @@ export default function Home() {
   };
 
   const handleCreateClips = async () => {
-    if (!downloadedVideo) {
-      alert("Please download a video first");
-      return;
-    }
-
+    // This now works as a preview step - no actual clip creation yet
     if (clips.length === 0) {
       alert("Please add at least one clip before creating clips");
       return;
@@ -204,13 +207,43 @@ export default function Home() {
       return;
     }
 
-    setIsProcessing(true);
+    setIsLoadingPreview(true);
+    setError(null);
+
+    try {
+      // Use downloadedVideo if available, otherwise the API will use the latest video
+      const response = await ClipSceneAPI.previewClips({
+        video_id: downloadedVideo?.video_id,
+        clips: clips.map(clip => ({
+          title: clip.title,
+          start_time: clip.startTime,
+          end_time: clip.endTime
+        }))
+      });
+
+      setClipsPreviewData(response);
+      setShowClipsPreview(true);
+
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to preview clips');
+    } finally {
+      setIsLoadingPreview(false);
+    }
+  };
+
+  const handleDownloadClips = async () => {
+    if (!clipsPreviewData) {
+      alert("No clips preview data available");
+      return;
+    }
+
+    setIsCreatingClips(true);
     setError(null);
     setJobStatus(null);
 
     try {
       const response = await ClipSceneAPI.createClipsFromVideo({
-        video_id: downloadedVideo.video_id,
+        video_id: downloadedVideo?.video_id || '', // Use empty string if no downloadedVideo (API will use latest)
         clips: clips.map(clip => ({
           title: clip.title,
           start_time: clip.startTime,
@@ -225,11 +258,22 @@ export default function Home() {
         setJobStatus(status);
       });
 
+      // Hide preview on successful completion
+      if (response.job_id) {
+        setShowClipsPreview(false);
+        setClipsPreviewData(null);
+      }
+
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create clips');
     } finally {
-      setIsProcessing(false);
+      setIsCreatingClips(false);
     }
+  };
+
+  const handleCancelPreview = () => {
+    setShowClipsPreview(false);
+    setClipsPreviewData(null);
   };
 
   const loadAvailableVideos = async () => {
@@ -448,7 +492,7 @@ export default function Home() {
                 <button
                   type="button"
                   onClick={handleCreateClips}
-                  disabled={isProcessing || !downloadedVideo || clips.length === 0}
+                  disabled={isLoadingPreview || clips.length === 0}
                   className={cn(
                     "flex-1 py-3 px-6 rounded-lg font-bold text-lg",
                     "bg-gray-800 border-2 force-orange-border force-white-text",
@@ -459,12 +503,22 @@ export default function Home() {
                     "flex items-center justify-center gap-2"
                   )}
                 >
-                  {isProcessing && <Loader2 className="h-4 w-4 animate-spin" />}
-                  {isProcessing ? "Creating clips..." : "Create Clips"}
+                  {isLoadingPreview && <Loader2 className="h-4 w-4 animate-spin" />}
+                  {isLoadingPreview ? "Loading preview..." : "Create Clips"}
                 </button>
               </div>
             </form>
           </div>
+
+          {/* Clips Preview */}
+          {showClipsPreview && clipsPreviewData && (
+            <ClipsPreview
+              previewData={clipsPreviewData}
+              onDownloadClips={handleDownloadClips}
+              onCancel={handleCancelPreview}
+              isDownloading={isCreatingClips}
+            />
+          )}
 
                     {/* Downloaded Video Status */}
           {videoStatus && (
