@@ -32,9 +32,9 @@ export const QualitySelector: React.FC<QualitySelectorProps> = ({
   downloadStatus
 }) => {
   return (
-    <div className="space-y-4">
-      <h3 className="text-lg font-medium text-theme-text-primary">Download Quality</h3>
-      <div className="grid grid-cols-4 gap-3">
+    <div className="flex w-full">
+      <h3 className="text-lg font-medium text-theme-text-primary w-60">Download Quality:</h3>
+      <div className="flex gap-2 w-full">
         {(['720p', '1080p', '1440p', '4K'] as const).map((quality) => {
           const isAvailable = isQualityAvailable(quality, availableFormats);
           
@@ -58,7 +58,7 @@ export const QualitySelector: React.FC<QualitySelectorProps> = ({
               onClick={() => !isDisabled && onQualityChange(quality)}
               disabled={isDisabled}
               className={cn(
-                "py-1 px-2 rounded-lg font-medium text-center transition-all duration-200",
+                "py-1 px-2 h-10 w-24 rounded-lg font-medium text-center transition-all duration-200",
                 "border-2",
                 isDisabled
                   ? "border-gray-600 bg-gray-800 text-gray-500 cursor-not-allowed opacity-50"
@@ -68,11 +68,6 @@ export const QualitySelector: React.FC<QualitySelectorProps> = ({
               )}
             >
               {quality}
-              {isLoadingFormats ? (
-                <span className="block text-xs mt-1 text-gray-400">Loading...</span>
-              ) : availableFormats.length > 0 && !isAvailable ? (
-                <span className="block text-xs mt-1 text-gray-500">N/A</span>
-              ) : null}
             </button>
           );
         })}

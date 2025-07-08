@@ -433,12 +433,11 @@ export default function Home() {
                   onClick={handleDownloadVideo}
                   disabled={isDownloading || !youtubeUrl.trim()}
                   className={cn(
-                    "flex-1 py-3 px-6 rounded-lg font-medium",
-                    "force-orange text-black",
+                    "flex-1 py-3 px-6 rounded-lg font-bold text-lg force-orange text-black",
                     "hover:bg-orange-600 hover:cursor-pointer",
                     "transition-all duration-200",
                     "focus:ring-2 focus:ring-orange-500 focus:ring-offset-2",
-                    "disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-gray-600 disabled:text-gray-400",
+                    "disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-gray-600 disabled:text-gray-800",
                     "flex items-center justify-center gap-2"
                   )}
                 >
@@ -451,12 +450,12 @@ export default function Home() {
                   onClick={handleCreateClips}
                   disabled={isProcessing || !downloadedVideo || clips.length === 0}
                   className={cn(
-                    "flex-1 py-3 px-6 rounded-lg font-medium",
+                    "flex-1 py-3 px-6 rounded-lg font-bold text-lg",
                     "bg-gray-800 border-2 force-orange-border force-white-text",
                     "hover:force-orange hover:text-black hover:cursor-pointer",
                     "transition-all duration-200",
                     "focus:ring-2 focus:ring-orange-500 focus:ring-offset-2",
-                    "disabled:opacity-50 disabled:cursor-not-allowed disabled:border-gray-600 disabled:text-gray-400",
+                    "disabled:opacity-50 disabled:cursor-not-allowed disabled:border-gray-600 disabled:text-gray-300",
                     "flex items-center justify-center gap-2"
                   )}
                 >
