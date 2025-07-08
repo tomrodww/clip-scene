@@ -275,7 +275,6 @@ export default function Home() {
                     <Clock className="h-5 w-5" />
                     Clip Timings
                   </h3>
-
                 </div>
 
                 {/* Clip Blocks */}
@@ -285,7 +284,7 @@ export default function Home() {
                       No clips added yet.
                     </div>
                   ) : (
-                                         clips.map((clip, index) => (
+                    clips.map((clip, index) => (
                       <ClipCard
                         key={clip.id}
                         clip={clip}

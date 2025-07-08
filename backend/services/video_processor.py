@@ -46,7 +46,7 @@ class VideoProcessor:
         
         return CustomLogger()
     
-    async def create_clip(self, video_path: str, start_time: str, end_time: str, job_id: str, clip_index: int, title: str = None) -> str:
+    async def create_clip(self, video_path: str, start_time: str, end_time: str, job_id: str, clip_index: int, title: str | None = None) -> str:
         """
         Create a video clip using ffmpeg
         
@@ -172,7 +172,7 @@ class VideoProcessor:
                     pass
             raise Exception(f"Failed to create clip: {str(e)}")
 
-    async def get_latest_video_from_downloads(self) -> dict:
+    async def get_latest_video_from_downloads(self) -> dict | None:
         """
         Get the most recently downloaded video from the downloads folder
         """
@@ -232,7 +232,7 @@ class VideoProcessor:
             def list_formats_sync():
                 with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                     info_dict = ydl.extract_info(youtube_url, download=False)
-                    formats = info_dict.get('formats', [])
+                    formats = info_dict.get('formats', []) if info_dict else []
                     
                     if len(formats) == 0:
                         return []
@@ -265,7 +265,7 @@ class VideoProcessor:
             print(f"Error listing formats: {e}")
             return []
     
-    async def download_video(self, youtube_url: str, job_id: str, format_id: str = None) -> str:
+    async def download_video(self, youtube_url: str, job_id: str, format_id: str | None = None) -> str:
         """
         Download video from YouTube using yt-dlp
         Returns the path to the downloaded video file

@@ -33,7 +33,7 @@ export const QualitySelector: React.FC<QualitySelectorProps> = ({
 }) => {
   return (
     <div className="flex w-full">
-      <h3 className="text-lg font-medium text-theme-text-primary w-60">Download Quality:</h3>
+      <h3 className="text-lg font-medium text-theme-text-primary w-60 mt-auto">Download Quality:</h3>
       <div className="flex gap-2 w-full">
         {(['720p', '1080p', '1440p', '4K'] as const).map((quality) => {
           const isAvailable = isQualityAvailable(quality, availableFormats);
@@ -58,13 +58,12 @@ export const QualitySelector: React.FC<QualitySelectorProps> = ({
               onClick={() => !isDisabled && onQualityChange(quality)}
               disabled={isDisabled}
               className={cn(
-                "py-1 px-2 h-10 w-24 rounded-lg font-medium text-center transition-all duration-200",
-                "border-2",
+                "px-2 h-8 w-24 rounded-lg font-medium text-center transition-all duration-200",
                 isDisabled
-                  ? "border-gray-600 bg-gray-800 text-gray-500 cursor-not-allowed opacity-50"
+                  ? "bg-gray-800 text-gray-500 cursor-not-allowed opacity-50"
                   : selectedQuality === quality
-                    ? "force-orange-border force-orange text-black hover:cursor-pointer"
-                    : "border-gray-600 bg-gray-800 force-white-text hover:force-orange-border hover:force-orange-text hover:bg-gray-700 hover:cursor-pointer"
+                    ? "force-orange text-black hover:cursor-pointer"
+                    : "bg-gray-800 hover:text-black hover:bg-orange-300 hover:cursor-pointer duration-200 transition-all"
               )}
             >
               {quality}
