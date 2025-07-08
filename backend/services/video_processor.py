@@ -2,14 +2,49 @@ import os
 import asyncio
 import yt_dlp
 import subprocess
+import logging
 
 class VideoProcessor:
     def __init__(self):
         self.download_dir = "downloads"
         self.clips_dir = "clips"
+        
         # Ensure directories exist
         os.makedirs(self.download_dir, exist_ok=True)
         os.makedirs(self.clips_dir, exist_ok=True)
+
+    def _get_yt_dlp_logger(self):
+        """Custom logger to suppress noisy YouTube output and keep only essential info"""
+        class CustomLogger:
+            def debug(self, msg):
+                # Suppress all debug messages
+                pass
+            
+            def info(self, msg):
+                # Only show download progress and essential info
+                if any(keyword in msg for keyword in ['Downloading', 'Merging', 'Converting']):
+                    # Show simplified download progress
+                    if 'Downloading' in msg and '%' in msg:
+                        # Extract just the percentage for progress
+                        if 'ETA' in msg:
+                            parts = msg.split()
+                            for i, part in enumerate(parts):
+                                if '%' in part:
+                                    print(f"📥 Download progress: {part}")
+                                    break
+                    elif 'Merging' in msg:
+                        print("🔄 Merging video and audio...")
+                    elif 'Converting' in msg:
+                        print("🔄 Converting video format...")
+            
+            def warning(self, msg):
+                # Suppress YouTube signature warnings and other noise
+                pass
+            
+            def error(self, msg):
+                print(f"❌ Download error: {msg}")
+        
+        return CustomLogger()
     
     async def create_clip(self, video_path: str, start_time: str, end_time: str, job_id: str, clip_index: int, title: str = None) -> str:
         """
@@ -89,8 +124,7 @@ class VideoProcessor:
                 output_path
             ]
             
-            print(f"Creating clip: {output_filename}")
-            print(f"Command: {' '.join(cmd)}")
+            print(f"✂️ Creating clip: {output_filename}")
             
             # Execute ffmpeg command in executor
             def run_ffmpeg_sync():
@@ -120,7 +154,13 @@ class VideoProcessor:
             if file_size < 1024:  # Less than 1KB is suspicious
                 raise Exception(f"Created clip file seems too small: {file_size} bytes")
             
-            print(f"✅ Clip created successfully: {output_path} ({file_size} bytes)")
+            # Format file size for display
+            if file_size > 1024 * 1024:
+                size_str = f"{file_size / (1024 * 1024):.1f}MB"
+            else:
+                size_str = f"{file_size / 1024:.1f}KB"
+            
+            print(f"✅ Clip created: {output_filename} ({size_str})")
             return output_path
             
         except Exception as e:
@@ -237,17 +277,20 @@ class VideoProcessor:
             # Set up download options
             if format_id:
                 # Use specific format if provided (video-only will be merged with best audio)
-                print(f"Downloading video with specific format: {format_id}")
+                print(f"📥 Starting download with format: {format_id}")
                 ydl_opts = {
                     'format': f'{format_id}+bestaudio/best',  # Merge with best audio
                     'outtmpl': os.path.join(self.download_dir, f'{safe_job_id}_%(title)s.%(ext)s'),
-                    'quiet': False,  # Show progress
+                    'quiet': True,  # Suppress most output
                     'noplaylist': True,
                     # Prefer mp4 for better compatibility
                     'merge_output_format': 'mp4',
+                    # Use custom logger to suppress noisy warnings
+                    'logger': self._get_yt_dlp_logger(),
                 }
             else:
                 # Use automatic best quality selection
+                print("📥 Starting download with best available quality...")
                 ydl_opts = {
                     # Format selection: prioritize highest quality video+audio
                     'format': (
@@ -263,10 +306,12 @@ class VideoProcessor:
                         'best'
                     ),
                     'outtmpl': os.path.join(self.download_dir, f'{safe_job_id}_%(title)s.%(ext)s'),
-                    'quiet': False,  # Show progress
+                    'quiet': True,  # Suppress most output
                     'noplaylist': True,
                     # Prefer mp4 for better compatibility
                     'merge_output_format': 'mp4',
+                    # Use custom logger to suppress noisy warnings
+                    'logger': self._get_yt_dlp_logger(),
                     # Ensure we get good quality audio
                     'postprocessors': [{
                         'key': 'FFmpegVideoConvertor',
@@ -277,19 +322,15 @@ class VideoProcessor:
                     'writethumbnail': False,
                 }
             
-            print(f"Downloading video from: {youtube_url}")
-            
             # Download function to run in executor
             def download_video_sync():
                 try:
                     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                         info_dict = ydl.extract_info(youtube_url, download=True)
                         file_name = ydl.prepare_filename(info_dict)
-                        print(f"✅ Download complete: {file_name}")
                         return file_name
                 except Exception as e:
-                    print(f"High-quality download attempt failed: {e}")
-                    print("Trying fallback with simpler format selection...")
+                    print("⚠️ Primary download failed, trying fallback...")
                     
                     # Fallback: try with simpler format selection
                     fallback_opts = ydl_opts.copy()
@@ -297,29 +338,29 @@ class VideoProcessor:
                     # Remove postprocessors that might cause issues
                     fallback_opts.pop('postprocessors', None)
                     fallback_opts.pop('merge_output_format', None)
+                    # Keep custom logger
+                    fallback_opts['logger'] = self._get_yt_dlp_logger()
                     
                     try:
                         with yt_dlp.YoutubeDL(fallback_opts) as ydl:
                             info_dict = ydl.extract_info(youtube_url, download=True)
                             file_name = ydl.prepare_filename(info_dict)
-                            print(f"✅ Fallback download complete: {file_name}")
                             return file_name
                     except Exception as e2:
-                        print(f"Fallback download also failed: {e2}")
-                        print("Trying final fallback with worst quality...")
+                        print("⚠️ Fallback failed, trying minimal download...")
                         
                         # Final fallback: get any available format
                         final_opts = {
                             'format': 'worst',
                             'outtmpl': os.path.join(self.download_dir, f'{safe_job_id}_%(title)s.%(ext)s'),
-                            'quiet': False,
+                            'quiet': True,
                             'noplaylist': True,
+                            'logger': self._get_yt_dlp_logger(),
                         }
                         
                         with yt_dlp.YoutubeDL(final_opts) as ydl:
                             info_dict = ydl.extract_info(youtube_url, download=True)
                             file_name = ydl.prepare_filename(info_dict)
-                            print(f"✅ Final fallback download complete: {file_name}")
                             return file_name
             
             # Run download in executor (async)
@@ -327,14 +368,44 @@ class VideoProcessor:
             
             # Verify file exists
             if os.path.exists(file_path):
-                print(f"✅ Verified downloaded file: {file_path}")
+                # Get file size for display
+                file_size = os.path.getsize(file_path)
+                if file_size > 1024 * 1024:
+                    size_str = f"{file_size / (1024 * 1024):.1f}MB"
+                else:
+                    size_str = f"{file_size / 1024:.1f}KB"
+                
+                # Extract title from filename for display
+                filename = os.path.basename(file_path)
+                if '_' in filename:
+                    title_part = filename.split('_', 1)[1] if len(filename.split('_', 1)) > 1 else filename
+                    title = os.path.splitext(title_part)[0]
+                else:
+                    title = os.path.splitext(filename)[0]
+                
+                print(f"✅ Download complete: {title} ({size_str})")
                 return file_path
             else:
                 # Search for the file in case filename differs
                 for filename in os.listdir(self.download_dir):
                     if filename.startswith(safe_job_id):
                         found_path = os.path.join(self.download_dir, filename)
-                        print(f"✅ Found downloaded file: {found_path}")
+                        
+                        # Get file size for display
+                        file_size = os.path.getsize(found_path)
+                        if file_size > 1024 * 1024:
+                            size_str = f"{file_size / (1024 * 1024):.1f}MB"
+                        else:
+                            size_str = f"{file_size / 1024:.1f}KB"
+                        
+                        # Extract title from filename for display
+                        if '_' in filename:
+                            title_part = filename.split('_', 1)[1] if len(filename.split('_', 1)) > 1 else filename
+                            title = os.path.splitext(title_part)[0]
+                        else:
+                            title = os.path.splitext(filename)[0]
+                        
+                        print(f"✅ Download complete: {title} ({size_str})")
                         return found_path
                 
                 raise Exception(f"Downloaded file not found. Expected: {file_path}")

@@ -265,7 +265,7 @@ async def download_and_create_clips_background(job_id: str, youtube_url: str, cl
                     clip.end_time, 
                     job_id, 
                     i,
-                    clip.title
+                    clip.title or f"Clip {i + 1}"
                 )
                 
                 job["clips"].append({
@@ -312,8 +312,13 @@ async def download_and_create_clips_background(job_id: str, youtube_url: str, cl
         processing_jobs[job_id]["status"] = "error"
         processing_jobs[job_id]["error"] = str(e)
         processing_jobs[job_id]["current_step"] = f"Process failed: {str(e)}"
-        print(f"Error in unified process {job_id}: {e}")
+        # Error already tracked in job status, no need for console output
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000) 
+    uvicorn.run(
+        app, 
+        host="0.0.0.0", 
+        port=8000, 
+        access_log=False  # Suppress access logs (HTTP request logs)
+    ) 

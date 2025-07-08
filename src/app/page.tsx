@@ -31,7 +31,6 @@ export default function Home() {
 
   // Unified process state
   const [isUnifiedProcessing, setIsUnifiedProcessing] = useState(false);
-  const [unifiedJobId, setUnifiedJobId] = useState<string | null>(null);
   const [unifiedJobStatus, setUnifiedJobStatus] = useState<JobStatusWithProgress | null>(null);
 
   // Auto-fetch video formats when URL changes (with debouncing)
@@ -165,8 +164,6 @@ export default function Home() {
         }))
       });
 
-      setUnifiedJobId(response.job_id);
-
       // Start polling for unified status
       await ClipSceneAPI.pollUnifiedJobStatus(response.job_id, (status) => {
         setUnifiedJobStatus(status);
@@ -288,7 +285,7 @@ export default function Home() {
                       No clips added yet.
                     </div>
                   ) : (
-                    clips.map((clip, index) => (
+                                         clips.map((clip, index) => (
                       <ClipCard
                         key={clip.id}
                         clip={clip}
