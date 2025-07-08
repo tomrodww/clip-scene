@@ -35,6 +35,7 @@ export interface CreateClipsResponse {
 
 export interface DownloadRequest {
   youtube_url: string;
+  format_id?: string;  // Optional format ID for quality selection
 }
 
 export interface DownloadResponse {
@@ -63,6 +64,20 @@ export interface VideoStatus {
 export interface CreateClipsFromVideoRequest {
   video_id: string;
   clips: ClipData[];
+}
+
+export interface VideoFormat {
+  format_id: string;
+  quality_label: string;
+  resolution: string;
+  fps: string | number;
+  ext: string;
+  filesize_mb?: number;
+  note?: string;
+}
+
+export interface VideoFormatsResponse {
+  formats: VideoFormat[];
 }
 
 const API_BASE = 'http://localhost:8000';
@@ -210,5 +225,23 @@ export class ClipSceneAPI {
 
       poll();
     });
+  }
+
+  // New format-related methods
+  static async getVideoFormats(request: { youtube_url: string }): Promise<VideoFormatsResponse> {
+    const response = await fetch(`${API_BASE}/video-formats`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(request),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.detail || 'Failed to get video formats');
+    }
+
+    return response.json();
   }
 } 

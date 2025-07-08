@@ -13,6 +13,7 @@ class ClipRequest(BaseModel):
 # New models for separated workflow
 class DownloadRequest(BaseModel):
     youtube_url: str
+    format_id: Optional[str] = None  # Specific format ID for quality selection
 
 class CreateClipsRequest(BaseModel):
     video_id: str  # ID of the downloaded video

@@ -202,195 +202,200 @@ export default function VideoPlayer({
         <Skeleton className="h-8 w-8 animate-spin text-gray-400" />
       </div>
     ) : (
-      <div className="bg-gray-800">
-      <div className="relative rounded-lg overflow-hidden mb-2">
-        {videoId ? (
-          <YouTube
-            videoId={videoId}
-            opts={opts}
-            onReady={onReady}
-            onPlay={onPlay}
-            onPause={onPause}
-            className="w-full"
-          />
-        ) : (
-          <div 
-            className="w-full bg-black flex items-center justify-center text-gray-500"
-            style={{ height: '360px' }}
+      <div>
+        <div className="relative rounded-lg overflow-hidden mb-2">
+          {videoId ? (
+            <YouTube
+              videoId={videoId}
+              opts={opts}
+              onReady={onReady}
+              onPlay={onPlay}
+              onPause={onPause}
+              className="w-full"
+            />
+          ) : (
+            <div 
+              className="w-full bg-black flex items-center justify-center text-gray-500"
+              style={{ height: '360px' }}
+            >
+              <p>No video loaded</p>
+            </div>
+          )}
+        </div>
+                  
+        <div className="relative group">
+          {/* Main progress bar track */}
+          <div
+            ref={progressBarRef}
+            className={cn(
+              "relative h-2 bg-gray-600 cursor-pointer",
+              "transition-all duration-200"
+            )}
+            onClick={handleProgressBarClick}
           >
-            <p>No video loaded</p>
-          </div>
-        )}
-      </div>
-                
-      <div className="relative group">
-        {/* Main progress bar track */}
-        <div
-          ref={progressBarRef}
-          className={cn(
-            "relative h-2 bg-gray-600 cursor-pointer",
-            "transition-all duration-200"
-          )}
-          onClick={handleProgressBarClick}
-        >
-          {/* Background track */}
-          <div className="absolute inset-0 bg-gray-600" />
-          
-          {/* Watched progress (before start) */}
-          {progressPercentage < startPercentage && (
-            <div
-              className="absolute top-0 h-full bg-gray-500 transition-all duration-100"
-              style={{ 
-                width: `${progressPercentage}%`
-              }}
-            />
-          )}
-          
-          {/* Clip selection area (between start and end) */}
-          <div
-            className={cn(
-              "absolute top-0 h-full bg-gray-700",
-              "transition-all duration-100"
-            )}
-            style={{
-              left: `${startPercentage}%`,
-              width: `${clipWidth}%`,
-            }}
-          />
-          
-          {/* Current playback progress within clip area */}
-          {progressPercentage >= startPercentage && progressPercentage <= endPercentage && (
-            <div
-              className="absolute top-0 h-full bg-white transition-all duration-100"
-              style={{ 
-                left: `${startPercentage}%`,
-                width: `${Math.min(progressPercentage - startPercentage, clipWidth)}%`
-              }}
-            />
-          )}
-        </div>
-
-        {/* Start time handle with vertical line */}
-        <div
-          className="absolute transform -translate-x-1/2 z-30 top-0 h-full"
-          style={{ left: `${startPercentage}%`}}
-        >
-          {/* Vertical line */}
-          <div className="absolute left-1/2 transform -translate-x-1/2 w-0.5 bg-white h-3" />
-          
-          {/* Circle handle on top */}
-          <div
-            className={cn(
-              "absolute -bottom-2.5 left-1/2 transform -translate-x-1/2 w-2 h-2 bg-white rounded-full cursor-pointer",
-              isDragging === 'start' && "scale-125 bg-white"
-            )}
-            onMouseDown={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              setIsDragging('start');
-              // Don't automatically seek - let user control when to seek
-            }}
-            title={`Start: ${formatSecondsToTime(startTime)}`}
-          />
-        </div>
-
-        {/* End time handle with vertical line */}
-        <div
-          className="absolute transform -translate-x-1/2 z-30 top-0 h-full"
-          style={{ left: `${endPercentage}%`}}
-        >
-          {/* Vertical line */}
-          <div className="absolute left-1/2 transform -translate-x-1/2 w-0.5 bg-white h-3" />
-          
-          {/* Circle handle on top */}
-          <div
-            className={cn(
-              "absolute -bottom-2.5 left-1/2 transform -translate-x-1/2 w-2 h-2 bg-white rounded-full cursor-pointer",
-              isDragging === 'end' && "scale-125 bg-white"
-            )}
-            onMouseDown={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              setIsDragging('end');
-            }}
-            title={`End: ${formatSecondsToTime(endTime)}`}
-          />
-        </div>
-
-
-        {/* Hover time tooltip */}
-        <div
-          className={cn(
-            "absolute bottom-8 transform -translate-x-1/2",
-            "bg-black text-white text-xs px-2 py-1 rounded",
-            "opacity-0 group-hover:opacity-100 transition-opacity",
-            "pointer-events-none z-40"
-          )}
-          style={{ 
-            left: `${progressPercentage}%`,
-            display: isDragging ? 'block' : 'none'
-          }}
-        >
-          {formatSecondsToTime(currentTime)}
-        </div>
-      </div>
-
-      {/* Custom Controls */}
-      <div className="py-4 space-y-4">
-        {/* Transport Controls */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <button
-              onClick={togglePlayPause}
-              className={cn(
-                "py-2 px-4 rounded-lg transition-colors",
-                "bg-gray-600 hover:bg-gray-500 text-white"
-              )}
-              disabled={!player}
-            >
-              {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
-            </button>
+            {/* Background track */}
+            <div className="absolute inset-0 bg-gray-600" />
             
-            <button
-              onClick={seekToStart}
+            {/* Watched progress (before start) */}
+            {progressPercentage < startPercentage && (
+              <div
+                className="absolute top-0 h-full bg-gray-500 transition-all duration-100"
+                style={{ 
+                  width: `${progressPercentage}%`
+                }}
+              />
+            )}
+            
+            {/* Clip selection area (between start and end) */}
+            <div
               className={cn(
-                "p-2 rounded-lg transition-colors",
-                "bg-gray-600 hover:bg-gray-500 text-white"
+                "absolute top-0 h-full bg-orange-200",
+                "transition-all duration-100"
               )}
-              disabled={!player}
-              title="Go to clip start"
-            >
-              <RotateCcw className="h-4 w-4" />
-            </button>
-            {/* Time Display */}
-            <div className="flex justify-between text-sm text-gray-400">
-              <span>{formatSecondsToTime(currentTime)} / {formatSecondsToTime(duration)}</span>
+              style={{
+                left: `${startPercentage}%`,
+                width: `${clipWidth}%`,
+              }}
+            />
+            
+            {/* Current playback progress within clip area */}
+            {progressPercentage >= startPercentage && progressPercentage <= endPercentage && (
+              <div
+                className="absolute top-0 h-full bg-orange-500 transition-all duration-100"
+                style={{ 
+                  left: `${startPercentage}%`,
+                  width: `${Math.min(progressPercentage - startPercentage, clipWidth)}%`
+                }}
+              />
+            )}
+          </div>
+
+          {/* Start time handle with vertical line */}
+          <div
+            className="absolute transform -translate-x-1/2 z-30 top-0 h-full"
+            style={{ left: `${startPercentage}%`}}
+          >
+            {/* Vertical line */}
+            <div className="absolute left-1/2 transform -translate-x-1/2 w-0.5 bg-white h-3" />
+            
+            {/* Circle handle on top */}
+            <div
+              className={cn(
+                "absolute -bottom-2.5 left-1/2 transform -translate-x-1/2 w-2 h-2 bg-white rounded-full cursor-pointer",
+                isDragging === 'start' && "scale-125 bg-white"
+              )}
+              onMouseDown={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setIsDragging('start');
+                // Don't automatically seek - let user control when to seek
+              }}
+              title={`Start: ${formatSecondsToTime(startTime)}`}
+            />
+          </div>
+
+          {/* End time handle with vertical line */}
+          <div
+            className="absolute transform -translate-x-1/2 z-30 top-0 h-full"
+            style={{ left: `${endPercentage}%`}}
+          >
+            {/* Vertical line */}
+            <div className="absolute left-1/2 transform -translate-x-1/2 w-0.5 bg-white h-3" />
+            
+            {/* Circle handle on top */}
+            <div
+              className={cn(
+                "absolute -bottom-2.5 left-1/2 transform -translate-x-1/2 w-2 h-2 bg-white rounded-full cursor-pointer",
+                isDragging === 'end' && "scale-125 bg-white"
+              )}
+              onMouseDown={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setIsDragging('end');
+              }}
+              title={`End: ${formatSecondsToTime(endTime)}`}
+            />
+          </div>
+
+
+          {/* Hover time tooltip */}
+          <div
+            className={cn(
+              "absolute bottom-8 transform -translate-x-1/2",
+              "bg-black text-white text-xs px-2 py-1 rounded",
+              "opacity-0 group-hover:opacity-100 transition-opacity",
+              "pointer-events-none z-40"
+            )}
+            style={{ 
+              left: `${progressPercentage}%`,
+              display: isDragging ? 'block' : 'none'
+            }}
+          >
+            {formatSecondsToTime(currentTime)}
+          </div>
+        </div>
+
+        {/* Custom Controls */}
+        <div className="py-4 space-y-4">
+          {/* Transport Controls */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={togglePlayPause}
+                className={cn(
+                  "py-2 px-4 rounded-lg transition-colors",
+                  "bg-gray-600 hover:bg-gray-500 text-white hover:cursor-pointer"
+                )}
+                disabled={!player}
+              >
+                {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+              </button>
+              
+              <button
+                type="button"
+                onClick={seekToStart}
+                className={cn(
+                  "p-2 rounded-lg transition-colors",
+                  "bg-gray-600 hover:bg-gray-500 text-white hover:cursor-pointer"
+                )}
+                disabled={!player}
+                title="Go to clip start"
+              >
+                <RotateCcw className="h-4 w-4" />
+              </button>
+              {/* Time Display */}
+              <div className="flex justify-between text-sm text-gray-400">
+                <span>{formatSecondsToTime(currentTime)} / {formatSecondsToTime(duration)}</span>
+              </div>
+            </div>
+            
+            
+            <div className="flex items-center gap-2">
+              <Volume2 className="h-4 w-4 text-gray-400" />
+              <input
+                type="range"
+                min="0"
+                max="100"
+                value={volume}
+                onChange={(e) => {
+                  const newVolume = parseInt(e.target.value);
+                  setVolume(newVolume);
+                  if (player) player.setVolume(newVolume);
+                }}
+                className="w-20 accent-orange-500 border-none"
+                style={{
+                  accentColor: '#ff8c00'
+                }}
+              />
             </div>
           </div>
-          
-          
-          <div className="flex items-center gap-2">
-            <Volume2 className="h-4 w-4 text-gray-400" />
-            <input
-              type="range"
-              min="0"
-              max="100"
-              value={volume}
-              onChange={(e) => {
-                const newVolume = parseInt(e.target.value);
-                setVolume(newVolume);
-                if (player) player.setVolume(newVolume);
-              }}
-              className="w-20"
-            />
-          </div>
+
+
+
+
         </div>
-
-
-
-
       </div>
-    </div>
     )
   );
 } 

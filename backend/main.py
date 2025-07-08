@@ -61,6 +61,7 @@ async def download_video(request: DownloadRequest, background_tasks: BackgroundT
             "status": "downloading",
             "current_step": "Starting download...",
             "youtube_url": request.youtube_url,
+            "format_id": request.format_id,
             "title": None,
             "file_path": None,
             "file_size": 0,
@@ -68,7 +69,7 @@ async def download_video(request: DownloadRequest, background_tasks: BackgroundT
         }
         
         # Start background download
-        background_tasks.add_task(download_video_background, video_id, request.youtube_url)
+        background_tasks.add_task(download_video_background, video_id, request.youtube_url, request.format_id)
         
         return {
             "video_id": video_id,
@@ -104,6 +105,106 @@ async def list_videos():
                 "youtube_url": info["youtube_url"]
             })
     return {"videos": videos}
+
+@app.post("/video-formats")
+async def get_video_formats(request: DownloadRequest):
+    """
+    Get available video formats for a YouTube URL
+    """
+    try:
+        if not request.youtube_url:
+            raise HTTPException(status_code=400, detail="YouTube URL is required")
+        
+        formats = await video_processor.list_available_formats(request.youtube_url)
+        
+        # Filter and format the results for frontend
+        quality_options = []
+        
+        # First, group formats by resolution and find best quality MP4 for each
+        resolution_groups = {}
+        
+        for fmt in formats:
+            vcodec = fmt['vcodec']
+            acodec = fmt['acodec']
+            has_video = vcodec != 'none'
+            ext = fmt['ext']
+            
+            # Accept only MP4 formats with video
+            if has_video and fmt['resolution'] and fmt['resolution'] != 'audio only' and ext == 'mp4':
+                resolution = fmt['resolution']
+                fps = fmt['fps'] or 0
+                filesize = fmt['filesize'] or 0
+                
+                # Use bitrate/filesize as quality indicator, with fps as secondary factor
+                quality_score = filesize + (fps * 1000000)  # Bias towards higher fps
+                
+                if resolution not in resolution_groups:
+                    resolution_groups[resolution] = []
+                
+                resolution_groups[resolution].append({
+                    'format': fmt,
+                    'quality_score': quality_score,
+                    'fps': fps,
+                    'filesize': filesize
+                })
+        
+        # Get the best quality format for each resolution
+        best_formats = []
+        for resolution, format_list in resolution_groups.items():
+            # Sort by quality score (highest first)
+            format_list.sort(key=lambda x: x['quality_score'], reverse=True)
+            best_format = format_list[0]['format']
+            best_formats.append(best_format)
+        
+        # Sort by resolution height (highest first) and take top 4
+        def get_resolution_height(fmt):
+            resolution = fmt['resolution']
+            if 'x' in str(resolution):
+                try:
+                    return int(resolution.split('x')[1])
+                except:
+                    return 0
+            return 0
+        
+        best_formats.sort(key=get_resolution_height, reverse=True)
+        top_formats = best_formats[:4]  # Keep only top 4
+        
+        # Convert to frontend format
+        for fmt in top_formats:
+            resolution = fmt['resolution']
+            fps = fmt['fps'] or 'Unknown'
+            ext = fmt['ext']
+            filesize = fmt['filesize']
+            
+            # Create a readable quality label
+            quality_label = f"{resolution}"
+            if fps != 'Unknown' and fps:
+                quality_label += f" ({fps}fps)"
+            
+            # Estimate file size (this will be video-only size, actual download will be larger)
+            size_mb = None
+            if filesize:
+                size_mb = round(filesize / (1024 * 1024), 1)
+            
+            # Add note about audio merging
+            note = fmt['note'] or ''
+            note = f"{note} (audio will be merged automatically)".strip()
+            
+            option = {
+                "format_id": fmt['format_id'],
+                "quality_label": quality_label,
+                "resolution": resolution,
+                "fps": fps,
+                "ext": ext,
+                "filesize_mb": size_mb,
+                "note": note
+            }
+            quality_options.append(option)
+        
+        return {"formats": quality_options}
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/create-clips-from-video")
 async def create_clips_from_video(request: CreateClipsRequest, background_tasks: BackgroundTasks):
@@ -228,7 +329,7 @@ async def download_clips(job_id: str):
         filename=f"clips_{job_id}.zip"
     )
 
-async def download_video_background(video_id: str, youtube_url: str):
+async def download_video_background(video_id: str, youtube_url: str, format_id: str = None):
     """
     Background task to download a video
     """
@@ -236,10 +337,13 @@ async def download_video_background(video_id: str, youtube_url: str):
         video_info = downloaded_videos[video_id]
         
         # Update status
-        video_info["current_step"] = "Downloading YouTube video..."
+        if format_id:
+            video_info["current_step"] = f"Downloading YouTube video (format: {format_id})..."
+        else:
+            video_info["current_step"] = "Downloading YouTube video (auto quality)..."
         
         # Download the video
-        video_path = await video_processor.download_video(youtube_url, video_id)
+        video_path = await video_processor.download_video(youtube_url, video_id, format_id)
         
         # Get file info
         file_size = os.path.getsize(video_path) if os.path.exists(video_path) else 0
